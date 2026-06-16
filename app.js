@@ -105,6 +105,8 @@ let activeThemeIndex = 0;
 let revealed = false;
 let activePuzzle = null;
 const answerPassword = "avito";
+const hintsByTheme = new Map();
+let activeClueKey = "";
 
 const tabsEl = document.querySelector("#theme-tabs");
 const gridEl = document.querySelector("#crossword-grid");
@@ -112,8 +114,11 @@ const titleEl = document.querySelector("#theme-title");
 const descriptionEl = document.querySelector("#theme-description");
 const acrossCluesEl = document.querySelector("#across-clues");
 const downCluesEl = document.querySelector("#down-clues");
+const selectedClueEl = document.querySelector("#selected-clue");
 const revealButton = document.querySelector("#reveal-button");
 const printButton = document.querySelector("#print-button");
+const hintButton = document.querySelector("#hint-button");
+const hintCountEl = document.querySelector("#hint-count");
 const wordCountEl = document.querySelector("#word-count");
 const gridSizeEl = document.querySelector("#grid-size");
 const passwordForm = document.querySelector("#password-form");
@@ -276,6 +281,7 @@ function renderTabs() {
     button.addEventListener("click", () => {
       activeThemeIndex = index;
       revealed = false;
+      activeClueKey = "";
       passwordStatus.textContent = "";
       passwordInput.value = "";
       render();
@@ -287,16 +293,20 @@ function renderTabs() {
 function render() {
   const theme = themes[activeThemeIndex];
   activePuzzle = buildPuzzle(theme.entries);
+  const hintedWords = getThemeHintState(theme.id).words;
 
   document.body.classList.toggle("revealed", revealed);
   revealButton.textContent = revealed ? "Hide words" : "Unlock words";
   titleEl.textContent = theme.title;
   descriptionEl.textContent = theme.description;
   wordCountEl.textContent = `${theme.entries.length} words`;
+  hintCountEl.textContent = `${3 - hintedWords.size} hints left`;
+  hintButton.disabled = hintedWords.size >= 3;
 
   renderTabs();
   renderGrid(activePuzzle);
   renderClues(activePuzzle.placed);
+  renderSelectedClue(activePuzzle.placed);
   renderAnswerBank(activePuzzle.placed);
 }
 
@@ -319,6 +329,13 @@ function renderGrid(puzzle) {
       if (col === 0) cell.classList.add("left-edge");
 
       if (char) {
+        const ownerWords = puzzle.placed.filter((item) => cellBelongsToWord(item, row, col)).map((item) => item.word);
+        const hintedWords = getThemeHintState(themes[activeThemeIndex].id).words;
+        const isHinted = ownerWords.some((word) => hintedWords.has(word));
+        const isActive = ownerWords.some((word) => getClueKey(puzzle.placed.find((item) => item.word === word)) === activeClueKey);
+        if (isHinted) cell.classList.add("hinted-cell");
+        if (isActive) cell.classList.add("active-cell");
+
         const number = numberByCell.get(key(row, col));
         if (number) {
           const numberEl = document.createElement("span");
@@ -330,6 +347,9 @@ function renderGrid(puzzle) {
         const letter = document.createElement("span");
         letter.className = "letter";
         letter.textContent = char;
+        if (isHinted) {
+          letter.classList.add("hint-letter");
+        }
         cell.appendChild(letter);
       }
 
@@ -354,14 +374,24 @@ function renderClueList(target, items) {
 
   for (const item of items) {
     const li = document.createElement("li");
-    const number = document.createElement("span");
+    li.className = getClueKey(item) === activeClueKey ? "active-clue-row" : "";
+
+    const number = document.createElement("button");
     number.className = "clue-number";
+    number.type = "button";
+    number.setAttribute("aria-label", `${item.number} ${item.dir} clue`);
+    number.setAttribute("aria-expanded", String(getClueKey(item) === activeClueKey));
     number.textContent = `${item.number}.`;
+    number.addEventListener("click", () => selectClue(item));
+    number.addEventListener("mouseenter", () => selectClue(item));
+    number.addEventListener("focus", () => selectClue(item));
 
     const text = document.createElement("span");
     text.className = "clue-text";
+    text.addEventListener("mouseenter", () => selectClue(item));
 
     const clue = document.createElement("span");
+    clue.className = "clue-question";
     clue.textContent = item.clue;
 
     const hint = document.createElement("span");
@@ -377,6 +407,9 @@ function renderClueList(target, items) {
 
     const answer = document.createElement("span");
     answer.className = "answer";
+    if (getThemeHintState(themes[activeThemeIndex].id).words.has(item.word)) {
+      answer.classList.add("hinted-answer");
+    }
     answer.textContent = item.word;
     hint.append(pattern, length);
     text.append(clue, hint, answer);
@@ -386,16 +419,94 @@ function renderClueList(target, items) {
   }
 }
 
+function renderSelectedClue(placed) {
+  const active = placed.find((item) => getClueKey(item) === activeClueKey);
+  if (!active) {
+    selectedClueEl.innerHTML = "<span class=\"selected-meta\">No clue selected</span><p class=\"selected-question\">Hover, focus, or tap a clue number to read the question.</p>";
+    return;
+  }
+
+  const hinted = getThemeHintState(themes[activeThemeIndex].id).words.has(active.word);
+  selectedClueEl.innerHTML = "";
+
+  const meta = document.createElement("span");
+  meta.className = "selected-meta";
+  meta.textContent = `${active.number} ${active.dir.toUpperCase()}`;
+
+  const clue = document.createElement("p");
+  clue.className = "selected-question";
+  clue.textContent = active.clue;
+
+  const pattern = document.createElement("span");
+  pattern.className = "word-pattern";
+  pattern.textContent = formatPattern(active.word);
+
+  const length = document.createElement("span");
+  length.className = "word-length";
+  length.textContent = `${active.word.length} letters`;
+
+  const answer = document.createElement("span");
+  answer.className = hinted ? "selected-answer visible" : "selected-answer";
+  answer.textContent = active.word;
+
+  const hintLine = document.createElement("div");
+  hintLine.className = "selected-hints";
+  hintLine.append(pattern, length, answer);
+
+  selectedClueEl.append(meta, clue, hintLine);
+}
+
 function renderAnswerBank(placed) {
   answerBankEl.innerHTML = "";
   const sortedWords = [...placed].sort(sortClues);
+  const hintedWords = getThemeHintState(themes[activeThemeIndex].id).words;
 
   for (const item of sortedWords) {
     const chip = document.createElement("span");
     chip.className = "answer-chip";
+    if (hintedWords.has(item.word)) chip.classList.add("hinted-chip");
     chip.textContent = `${item.number}. ${item.word}`;
     answerBankEl.appendChild(chip);
   }
+}
+
+function selectClue(item) {
+  activeClueKey = getClueKey(item);
+  render();
+}
+
+function revealOneWord() {
+  const theme = themes[activeThemeIndex];
+  const state = getThemeHintState(theme.id);
+  if (state.words.size >= 3 || !activePuzzle) return;
+
+  const candidates = [...activePuzzle.placed].sort(sortClues).filter((item) => !state.words.has(item.word));
+  const active = candidates.find((item) => getClueKey(item) === activeClueKey);
+  const item = active || candidates[0];
+  if (!item) return;
+
+  state.words.add(item.word);
+  activeClueKey = getClueKey(item);
+  passwordStatus.textContent = `Hint used: ${item.word}`;
+  render();
+}
+
+function getThemeHintState(themeId) {
+  if (!hintsByTheme.has(themeId)) {
+    hintsByTheme.set(themeId, { words: new Set() });
+  }
+  return hintsByTheme.get(themeId);
+}
+
+function getClueKey(item) {
+  return `${item.dir}-${item.number}-${item.word}`;
+}
+
+function cellBelongsToWord(item, row, col) {
+  if (item.dir === "across") {
+    return row === item.row && col >= item.col && col < item.col + item.word.length;
+  }
+  return col === item.col && row >= item.row && row < item.row + item.word.length;
 }
 
 function formatPattern(word) {
@@ -418,6 +529,8 @@ revealButton.addEventListener("click", () => {
 printButton.addEventListener("click", () => {
   window.print();
 });
+
+hintButton.addEventListener("click", revealOneWord);
 
 passwordForm.addEventListener("submit", (event) => {
   event.preventDefault();

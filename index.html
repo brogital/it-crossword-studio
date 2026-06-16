@@ -30,7 +30,13 @@
               <p class="section-label">Theme</p>
               <h2 id="theme-title"></h2>
             </div>
-            <p id="theme-description" class="theme-description"></p>
+            <div class="theme-copy">
+              <p id="theme-description" class="theme-description"></p>
+              <div class="hint-toolbar" aria-label="Word hint controls">
+                <button class="text-button hint-button" id="hint-button" type="button">Reveal one word</button>
+                <span class="hint-count" id="hint-count">3 hints left</span>
+              </div>
+            </div>
           </div>
 
           <div class="puzzle-layout">
@@ -46,10 +52,11 @@
               <div class="clue-card-header">
                 <div>
                   <p class="section-label">Clues</p>
-                  <h3>Across and down</h3>
+                  <h3>Pick a clue number</h3>
                 </div>
                 <span class="pill">12 words</span>
               </div>
+              <div class="selected-clue" id="selected-clue" aria-live="polite"></div>
               <div class="clue-columns">
                 <section>
                   <h4>Across</h4>
