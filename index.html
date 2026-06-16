@@ -45,11 +45,15 @@
               <div class="grid-meta">
                 <span id="word-count"></span>
                 <span id="solve-count" class="solve-count">0 solved</span>
-                <span class="grid-instruction">Tap a square, then type</span>
+                <span class="grid-instruction">Tap a square, then use the type box</span>
                 <span id="grid-size"></span>
               </div>
               <div id="crossword-grid" class="crossword-grid" aria-label="Crossword grid"></div>
-              <input id="letter-input" class="letter-input" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" aria-label="Crossword letter input">
+              <div class="mobile-entry" id="mobile-entry">
+                <label for="letter-input">Type letters</label>
+                <input id="letter-input" class="letter-input" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="next" maxlength="24" placeholder="Select a square, then type">
+                <span id="entry-status" class="entry-status">No square selected</span>
+              </div>
             </div>
 
             <aside class="clue-card" aria-label="Clues">

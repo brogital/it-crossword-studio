@@ -127,6 +127,7 @@ const wordCountEl = document.querySelector("#word-count");
 const solveCountEl = document.querySelector("#solve-count");
 const gridSizeEl = document.querySelector("#grid-size");
 const letterInput = document.querySelector("#letter-input");
+const entryStatusEl = document.querySelector("#entry-status");
 const passwordForm = document.querySelector("#password-form");
 const passwordInput = document.querySelector("#password-input");
 const passwordStatus = document.querySelector("#password-status");
@@ -319,6 +320,7 @@ function render() {
   renderClues(activePuzzle.placed);
   renderSelectedClue(activePuzzle.placed);
   renderAnswerBank(activePuzzle.placed);
+  renderEntryStatus(activePuzzle.placed);
   saveProgressState();
 }
 
@@ -498,6 +500,23 @@ function renderSelectedClue(placed) {
   selectedClueEl.append(meta, clue, hintLine);
 }
 
+function renderEntryStatus(placed) {
+  const active = placed.find((item) => getClueKey(item) === activeClueKey);
+  if (!active || !activeCellKey) {
+    entryStatusEl.textContent = "Select a square in the crossword";
+    return;
+  }
+
+  const [row, col] = activeCellKey.split(",").map(Number);
+  const index = active.dir === "across" ? col - active.col : row - active.row;
+  const currentLetter = getThemeLetterState(themes[activeThemeIndex].id).get(activeCellKey);
+  const position = Math.max(0, Math.min(active.word.length - 1, index)) + 1;
+  const filled = getFilledCount(active, themes[activeThemeIndex].id);
+  const solved = isWordSolved(active, themes[activeThemeIndex].id);
+  const typed = currentLetter ? ` · typed ${currentLetter}` : "";
+  entryStatusEl.textContent = `${active.number} ${active.dir.toUpperCase()} · letter ${position} of ${active.word.length}${typed} · ${filled}/${active.word.length} filled${solved ? " · solved" : ""}`;
+}
+
 function renderAnswerBank(placed) {
   answerBankEl.innerHTML = "";
   const sortedWords = [...placed].sort(sortClues);
@@ -582,13 +601,21 @@ function selectCell(row, col, shouldFocus = true) {
 
 function focusLetterInput() {
   letterInput.value = "";
-  letterInput.focus({ preventScroll: true });
+  letterInput.focus();
 }
 
 function handleLetterInput(value) {
-  if (!activePuzzle || !activeCellKey) return;
+  if (!activePuzzle || !activeCellKey) {
+    letterInput.value = "";
+    renderEntryStatus(activePuzzle ? activePuzzle.placed : []);
+    return;
+  }
   const letters = value.toUpperCase().match(/[A-Z]/g);
-  if (!letters) return;
+  if (!letters) {
+    letterInput.value = "";
+    renderEntryStatus(activePuzzle.placed);
+    return;
+  }
 
   const themeLetters = getThemeLetterState(themes[activeThemeIndex].id);
   for (const letter of letters) {
