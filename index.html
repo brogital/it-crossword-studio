@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>IT Crossword Studio</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace" aria-labelledby="page-title">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">English practice for IT teams</p>
+            <h1 id="page-title">IT Crossword Studio</h1>
+          </div>
+          <div class="toolbar" aria-label="Crossword actions">
+            <button class="icon-button" id="print-button" type="button" aria-label="Print current crossword" title="Print">
+              <span aria-hidden="true">⎙</span>
+            </button>
+            <button class="text-button" id="reveal-button" type="button">Unlock words</button>
+          </div>
+        </header>
+
+        <nav class="theme-tabs" id="theme-tabs" aria-label="Crossword themes"></nav>
+
+        <section class="puzzle-panel" aria-live="polite">
+          <div class="puzzle-header">
+            <div>
+              <p class="section-label">Theme</p>
+              <h2 id="theme-title"></h2>
+            </div>
+            <p id="theme-description" class="theme-description"></p>
+          </div>
+
+          <div class="puzzle-layout">
+            <div class="grid-wrap">
+              <div class="grid-meta">
+                <span id="word-count"></span>
+                <span id="grid-size"></span>
+              </div>
+              <div id="crossword-grid" class="crossword-grid" aria-label="Crossword grid"></div>
+            </div>
+
+            <aside class="clue-card" aria-label="Clues">
+              <div class="clue-card-header">
+                <div>
+                  <p class="section-label">Clues</p>
+                  <h3>Across and down</h3>
+                </div>
+                <span class="pill">12 words</span>
+              </div>
+              <div class="clue-columns">
+                <section>
+                  <h4>Across</h4>
+                  <ol id="across-clues" class="clue-list"></ol>
+                </section>
+                <section>
+                  <h4>Down</h4>
+                  <ol id="down-clues" class="clue-list"></ol>
+                </section>
+              </div>
+
+              <section class="answer-vault" aria-labelledby="answer-vault-title">
+                <div class="vault-copy">
+                  <p class="section-label">Answer vault</p>
+                  <h4 id="answer-vault-title">Word bank is locked</h4>
+                  <p>Enter the classroom password to reveal all words and fill the grid.</p>
+                </div>
+                <form class="password-form" id="password-form">
+                  <label for="password-input">Password</label>
+                  <div class="password-row">
+                    <input id="password-input" type="password" autocomplete="off" placeholder="Enter password">
+                    <button class="text-button" type="submit">Reveal</button>
+                  </div>
+                  <p id="password-status" class="password-status" role="status"></p>
+                </form>
+                <div id="answer-bank" class="answer-bank" aria-live="polite"></div>
+              </section>
+            </aside>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
