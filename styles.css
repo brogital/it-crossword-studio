@@ -148,6 +148,11 @@ h4 {
   box-shadow: none;
 }
 
+.reset-button {
+  background: #fffdf5;
+  box-shadow: none;
+}
+
 .icon-button:hover,
 .text-button:hover:not(:disabled),
 .theme-tab:hover {
@@ -243,6 +248,17 @@ h4 {
   text-transform: uppercase;
 }
 
+.grid-instruction {
+  color: var(--accent-deep);
+}
+
+.solve-count {
+  background: var(--paper-deep);
+  border: 1px solid var(--rule);
+  padding: 3px 7px;
+  color: var(--rule);
+}
+
 .crossword-grid {
   display: grid;
   width: 100%;
@@ -281,8 +297,21 @@ h4 {
   background: var(--hint);
 }
 
+.cell.solved-cell {
+  background: #cfe8c7;
+}
+
 .cell.active-cell.hinted-cell {
   background: linear-gradient(135deg, var(--hint) 0 52%, var(--blue-note) 52% 100%);
+}
+
+.cell.active-cell.solved-cell {
+  background: linear-gradient(135deg, #cfe8c7 0 52%, var(--blue-note) 52% 100%);
+}
+
+.cell.selected-cell {
+  box-shadow: inset 0 0 0 3px var(--accent);
+  z-index: 1;
 }
 
 .number {
@@ -300,8 +329,23 @@ h4 {
 }
 
 .revealed .letter,
-.hint-letter {
+.hint-letter,
+.user-letter {
   visibility: visible;
+}
+
+.user-letter {
+  color: #17385d;
+}
+
+.letter-input {
+  position: fixed;
+  left: -100px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  opacity: 0;
 }
 
 .clue-card {
@@ -374,6 +418,25 @@ h4 {
   display: inline-flex;
 }
 
+.selected-status {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  border: 1px solid var(--rule-soft);
+  background: #fffdf5;
+  padding: 0 8px;
+  color: var(--muted);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.selected-status.solved {
+  border-color: #4f7b3a;
+  background: #cfe8c7;
+  color: #254718;
+}
+
 .clue-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -402,6 +465,16 @@ h4 {
   background: var(--hint);
 }
 
+.solved-clue-row .clue-number {
+  background: #cfe8c7;
+}
+
+.solved-clue-row .clue-question {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: rgba(79, 123, 58, 0.7);
+}
+
 .clue-number {
   min-height: 26px;
   border: 1px solid var(--rule);
@@ -427,22 +500,36 @@ h4 {
 }
 
 .clue-question {
-  display: none;
   border-left: 3px solid var(--accent);
   padding-left: 8px;
 }
 
-.active-clue-row .clue-question,
-.clue-list li:hover .clue-question,
-.clue-list li:focus-within .clue-question {
-  display: block;
-}
-
 .clue-hint {
-  display: flex;
+  display: none;
   flex-wrap: wrap;
   gap: 5px;
   align-items: center;
+}
+
+.active-clue-row .clue-hint,
+.solved-clue-row .clue-hint,
+.clue-list li:hover .clue-hint,
+.clue-list li:focus-within .clue-hint {
+  display: flex;
+}
+
+.solved-mark {
+  display: inline-flex;
+  min-height: 23px;
+  align-items: center;
+  border: 1px solid #4f7b3a;
+  background: #cfe8c7;
+  padding: 0 7px;
+  color: #254718;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .word-pattern,
@@ -564,6 +651,11 @@ h4 {
 .answer-chip.hinted-chip {
   display: block;
   background: var(--hint);
+}
+
+.answer-chip.solved-chip {
+  display: block;
+  background: #cfe8c7;
 }
 
 .revealed .vault-copy h4 {

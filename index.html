@@ -34,6 +34,7 @@
               <p id="theme-description" class="theme-description"></p>
               <div class="hint-toolbar" aria-label="Word hint controls">
                 <button class="text-button hint-button" id="hint-button" type="button">Reveal one word</button>
+                <button class="text-button reset-button" id="reset-button" type="button">Reset progress</button>
                 <span class="hint-count" id="hint-count">3 hints left</span>
               </div>
             </div>
@@ -43,9 +44,12 @@
             <div class="grid-wrap">
               <div class="grid-meta">
                 <span id="word-count"></span>
+                <span id="solve-count" class="solve-count">0 solved</span>
+                <span class="grid-instruction">Tap a square, then type</span>
                 <span id="grid-size"></span>
               </div>
               <div id="crossword-grid" class="crossword-grid" aria-label="Crossword grid"></div>
+              <input id="letter-input" class="letter-input" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" aria-label="Crossword letter input">
             </div>
 
             <aside class="clue-card" aria-label="Clues">

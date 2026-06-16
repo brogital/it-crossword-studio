@@ -105,8 +105,11 @@ let activeThemeIndex = 0;
 let revealed = false;
 let activePuzzle = null;
 const answerPassword = "avito";
+const storageKey = "it-crossword-studio-progress-v1";
 const hintsByTheme = new Map();
+const userLettersByTheme = new Map();
 let activeClueKey = "";
+let activeCellKey = "";
 
 const tabsEl = document.querySelector("#theme-tabs");
 const gridEl = document.querySelector("#crossword-grid");
@@ -119,8 +122,11 @@ const revealButton = document.querySelector("#reveal-button");
 const printButton = document.querySelector("#print-button");
 const hintButton = document.querySelector("#hint-button");
 const hintCountEl = document.querySelector("#hint-count");
+const resetButton = document.querySelector("#reset-button");
 const wordCountEl = document.querySelector("#word-count");
+const solveCountEl = document.querySelector("#solve-count");
 const gridSizeEl = document.querySelector("#grid-size");
+const letterInput = document.querySelector("#letter-input");
 const passwordForm = document.querySelector("#password-form");
 const passwordInput = document.querySelector("#password-input");
 const passwordStatus = document.querySelector("#password-status");
@@ -282,8 +288,10 @@ function renderTabs() {
       activeThemeIndex = index;
       revealed = false;
       activeClueKey = "";
+      activeCellKey = "";
       passwordStatus.textContent = "";
       passwordInput.value = "";
+      letterInput.value = "";
       render();
     });
     tabsEl.appendChild(button);
@@ -294,12 +302,15 @@ function render() {
   const theme = themes[activeThemeIndex];
   activePuzzle = buildPuzzle(theme.entries);
   const hintedWords = getThemeHintState(theme.id).words;
+  const progress = getProgressSnapshot();
+  const themeProgress = progress.byTheme[theme.id];
 
   document.body.classList.toggle("revealed", revealed);
   revealButton.textContent = revealed ? "Hide words" : "Unlock words";
   titleEl.textContent = theme.title;
   descriptionEl.textContent = theme.description;
   wordCountEl.textContent = `${theme.entries.length} words`;
+  solveCountEl.textContent = `${themeProgress.solved} / ${themeProgress.total} solved · ${themeProgress.percent}% theme · ${progress.total.percent}% total`;
   hintCountEl.textContent = `${3 - hintedWords.size} hints left`;
   hintButton.disabled = hintedWords.size >= 3;
 
@@ -308,6 +319,7 @@ function render() {
   renderClues(activePuzzle.placed);
   renderSelectedClue(activePuzzle.placed);
   renderAnswerBank(activePuzzle.placed);
+  saveProgressState();
 }
 
 function renderGrid(puzzle) {
@@ -333,8 +345,21 @@ function renderGrid(puzzle) {
         const hintedWords = getThemeHintState(themes[activeThemeIndex].id).words;
         const isHinted = ownerWords.some((word) => hintedWords.has(word));
         const isActive = ownerWords.some((word) => getClueKey(puzzle.placed.find((item) => item.word === word)) === activeClueKey);
+        const cellKey = key(row, col);
+        const userLetter = getThemeLetterState(themes[activeThemeIndex].id).get(cellKey);
+        const isSolved = ownerWords.some((word) => {
+          const owner = puzzle.placed.find((item) => item.word === word);
+          return owner && isWordSolved(owner, themes[activeThemeIndex].id);
+        });
         if (isHinted) cell.classList.add("hinted-cell");
         if (isActive) cell.classList.add("active-cell");
+        if (isSolved) cell.classList.add("solved-cell");
+        if (cellKey === activeCellKey) cell.classList.add("selected-cell");
+        cell.tabIndex = 0;
+        cell.setAttribute("role", "button");
+        cell.setAttribute("aria-label", `Cell ${row + 1}, ${col + 1}`);
+        cell.addEventListener("click", () => selectCell(row, col));
+        cell.addEventListener("focus", () => selectCell(row, col, false));
 
         const number = numberByCell.get(key(row, col));
         if (number) {
@@ -346,9 +371,12 @@ function renderGrid(puzzle) {
 
         const letter = document.createElement("span");
         letter.className = "letter";
-        letter.textContent = char;
+        letter.textContent = revealed || isHinted ? char : (userLetter || char);
         if (isHinted) {
           letter.classList.add("hint-letter");
+        }
+        if (userLetter && !isHinted && !revealed) {
+          letter.classList.add("user-letter");
         }
         cell.appendChild(letter);
       }
@@ -374,7 +402,10 @@ function renderClueList(target, items) {
 
   for (const item of items) {
     const li = document.createElement("li");
-    li.className = getClueKey(item) === activeClueKey ? "active-clue-row" : "";
+    li.className = [
+      getClueKey(item) === activeClueKey ? "active-clue-row" : "",
+      isWordSolved(item, themes[activeThemeIndex].id) ? "solved-clue-row" : ""
+    ].filter(Boolean).join(" ");
 
     const number = document.createElement("button");
     number.className = "clue-number";
@@ -412,6 +443,12 @@ function renderClueList(target, items) {
     }
     answer.textContent = item.word;
     hint.append(pattern, length);
+    if (isWordSolved(item, themes[activeThemeIndex].id)) {
+      const solvedMark = document.createElement("span");
+      solvedMark.className = "solved-mark";
+      solvedMark.textContent = "Solved";
+      hint.appendChild(solvedMark);
+    }
     text.append(clue, hint, answer);
 
     li.append(number, text);
@@ -422,11 +459,12 @@ function renderClueList(target, items) {
 function renderSelectedClue(placed) {
   const active = placed.find((item) => getClueKey(item) === activeClueKey);
   if (!active) {
-    selectedClueEl.innerHTML = "<span class=\"selected-meta\">No clue selected</span><p class=\"selected-question\">Hover, focus, or tap a clue number to read the question.</p>";
+    selectedClueEl.innerHTML = "<span class=\"selected-meta\">No clue selected</span><p class=\"selected-question\">Hover, focus, or tap a clue number to see its first and last letter.</p>";
     return;
   }
 
   const hinted = getThemeHintState(themes[activeThemeIndex].id).words.has(active.word);
+  const solved = isWordSolved(active, themes[activeThemeIndex].id);
   selectedClueEl.innerHTML = "";
 
   const meta = document.createElement("span");
@@ -446,12 +484,16 @@ function renderSelectedClue(placed) {
   length.textContent = `${active.word.length} letters`;
 
   const answer = document.createElement("span");
-  answer.className = hinted ? "selected-answer visible" : "selected-answer";
+  answer.className = hinted || solved ? "selected-answer visible" : "selected-answer";
   answer.textContent = active.word;
+
+  const status = document.createElement("span");
+  status.className = solved ? "selected-status solved" : "selected-status";
+  status.textContent = solved ? "Solved" : `${getFilledCount(active, themes[activeThemeIndex].id)} / ${active.word.length} filled`;
 
   const hintLine = document.createElement("div");
   hintLine.className = "selected-hints";
-  hintLine.append(pattern, length, answer);
+  hintLine.append(pattern, length, answer, status);
 
   selectedClueEl.append(meta, clue, hintLine);
 }
@@ -465,6 +507,7 @@ function renderAnswerBank(placed) {
     const chip = document.createElement("span");
     chip.className = "answer-chip";
     if (hintedWords.has(item.word)) chip.classList.add("hinted-chip");
+    if (isWordSolved(item, themes[activeThemeIndex].id)) chip.classList.add("solved-chip");
     chip.textContent = `${item.number}. ${item.word}`;
     answerBankEl.appendChild(chip);
   }
@@ -472,7 +515,9 @@ function renderAnswerBank(placed) {
 
 function selectClue(item) {
   activeClueKey = getClueKey(item);
+  activeCellKey = key(item.row, item.col);
   render();
+  focusLetterInput();
 }
 
 function revealOneWord() {
@@ -488,6 +533,7 @@ function revealOneWord() {
   state.words.add(item.word);
   activeClueKey = getClueKey(item);
   passwordStatus.textContent = `Hint used: ${item.word}`;
+  saveProgressState();
   render();
 }
 
@@ -496,6 +542,13 @@ function getThemeHintState(themeId) {
     hintsByTheme.set(themeId, { words: new Set() });
   }
   return hintsByTheme.get(themeId);
+}
+
+function getThemeLetterState(themeId) {
+  if (!userLettersByTheme.has(themeId)) {
+    userLettersByTheme.set(themeId, new Map());
+  }
+  return userLettersByTheme.get(themeId);
 }
 
 function getClueKey(item) {
@@ -512,6 +565,195 @@ function cellBelongsToWord(item, row, col) {
 function formatPattern(word) {
   if (word.length <= 2) return word;
   return `${word[0]}${"-".repeat(word.length - 2)}${word[word.length - 1]}`;
+}
+
+function selectCell(row, col, shouldFocus = true) {
+  if (!activePuzzle || !readCell(activePuzzle.grid, row, col)) return;
+  activeCellKey = key(row, col);
+
+  const cellWords = activePuzzle.placed.filter((item) => cellBelongsToWord(item, row, col));
+  const activeWord = cellWords.find((item) => getClueKey(item) === activeClueKey);
+  const preferredWord = activeWord || cellWords.find((item) => item.dir === "across") || cellWords[0];
+  if (preferredWord) activeClueKey = getClueKey(preferredWord);
+
+  render();
+  if (shouldFocus) focusLetterInput();
+}
+
+function focusLetterInput() {
+  letterInput.value = "";
+  letterInput.focus({ preventScroll: true });
+}
+
+function handleLetterInput(value) {
+  if (!activePuzzle || !activeCellKey) return;
+  const letters = value.toUpperCase().match(/[A-Z]/g);
+  if (!letters) return;
+
+  const themeLetters = getThemeLetterState(themes[activeThemeIndex].id);
+  for (const letter of letters) {
+    themeLetters.set(activeCellKey, letter);
+    moveActiveCell(1);
+  }
+  letterInput.value = "";
+  saveProgressState();
+  render();
+  focusLetterInput();
+}
+
+function handleBackspace() {
+  if (!activePuzzle || !activeCellKey) return;
+  const letters = getThemeLetterState(themes[activeThemeIndex].id);
+
+  if (letters.has(activeCellKey)) {
+    letters.delete(activeCellKey);
+  } else {
+    moveActiveCell(-1);
+    letters.delete(activeCellKey);
+  }
+
+  saveProgressState();
+  render();
+  focusLetterInput();
+}
+
+function moveActiveCell(step) {
+  const active = activePuzzle.placed.find((item) => getClueKey(item) === activeClueKey);
+  if (!active || !activeCellKey) return;
+
+  const [row, col] = activeCellKey.split(",").map(Number);
+  const index = active.dir === "across" ? col - active.col : row - active.row;
+  const nextIndex = Math.max(0, Math.min(active.word.length - 1, index + step));
+  const nextRow = active.row + (active.dir === "down" ? nextIndex : 0);
+  const nextCol = active.col + (active.dir === "across" ? nextIndex : 0);
+  activeCellKey = key(nextRow, nextCol);
+}
+
+function countSolvedWords(placed, themeId = themes[activeThemeIndex].id) {
+  return placed.filter((item) => isWordSolved(item, themeId)).length;
+}
+
+function isWordSolved(item, themeId = themes[activeThemeIndex].id) {
+  const letters = getThemeLetterState(themeId);
+  for (let index = 0; index < item.word.length; index += 1) {
+    const row = item.row + (item.dir === "down" ? index : 0);
+    const col = item.col + (item.dir === "across" ? index : 0);
+    if (letters.get(key(row, col)) !== item.word[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function getFilledCount(item, themeId = themes[activeThemeIndex].id) {
+  const letters = getThemeLetterState(themeId);
+  let count = 0;
+  for (let index = 0; index < item.word.length; index += 1) {
+    const row = item.row + (item.dir === "down" ? index : 0);
+    const col = item.col + (item.dir === "across" ? index : 0);
+    if (letters.has(key(row, col))) count += 1;
+  }
+  return count;
+}
+
+function getProgressSnapshot() {
+  const byTheme = {};
+  let solvedTotal = 0;
+  let wordTotal = 0;
+
+  for (const theme of themes) {
+    const puzzle = theme.id === themes[activeThemeIndex].id && activePuzzle ? activePuzzle : buildPuzzle(theme.entries);
+    const solved = countSolvedWords(puzzle.placed, theme.id);
+    const total = theme.entries.length;
+    byTheme[theme.id] = {
+      solved,
+      total,
+      percent: total ? Math.round((solved / total) * 100) : 0
+    };
+    solvedTotal += solved;
+    wordTotal += total;
+  }
+
+  return {
+    byTheme,
+    total: {
+      solved: solvedTotal,
+      total: wordTotal,
+      percent: wordTotal ? Math.round((solvedTotal / wordTotal) * 100) : 0
+    }
+  };
+}
+
+function serializeMapOfMaps(source) {
+  const result = {};
+  for (const [themeId, map] of source.entries()) {
+    result[themeId] = Object.fromEntries(map.entries());
+  }
+  return result;
+}
+
+function serializeHints() {
+  const result = {};
+  for (const [themeId, state] of hintsByTheme.entries()) {
+    result[themeId] = [...state.words];
+  }
+  return result;
+}
+
+function saveProgressState() {
+  const payload = {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    activeThemeId: themes[activeThemeIndex].id,
+    letters: serializeMapOfMaps(userLettersByTheme),
+    hints: serializeHints(),
+    progress: getProgressSnapshot()
+  };
+
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(payload));
+  } catch {
+    passwordStatus.textContent = "Progress could not be saved in this browser.";
+  }
+}
+
+function loadProgressState() {
+  let saved = null;
+
+  try {
+    saved = JSON.parse(localStorage.getItem(storageKey));
+  } catch {
+    saved = null;
+  }
+
+  if (!saved || saved.version !== 1) return;
+
+  for (const [themeId, letters] of Object.entries(saved.letters || {})) {
+    userLettersByTheme.set(themeId, new Map(Object.entries(letters)));
+  }
+
+  for (const [themeId, words] of Object.entries(saved.hints || {})) {
+    hintsByTheme.set(themeId, { words: new Set(words) });
+  }
+}
+
+function resetProgress() {
+  hintsByTheme.clear();
+  userLettersByTheme.clear();
+  revealed = false;
+  activeClueKey = "";
+  activeCellKey = "";
+  passwordInput.value = "";
+  letterInput.value = "";
+  passwordStatus.textContent = "Progress reset.";
+
+  try {
+    localStorage.removeItem(storageKey);
+  } catch {
+    passwordStatus.textContent = "Progress reset locally, but storage could not be cleared.";
+  }
+
+  render();
 }
 
 revealButton.addEventListener("click", () => {
@@ -531,6 +773,31 @@ printButton.addEventListener("click", () => {
 });
 
 hintButton.addEventListener("click", revealOneWord);
+resetButton.addEventListener("click", resetProgress);
+
+letterInput.addEventListener("input", (event) => {
+  handleLetterInput(event.target.value);
+});
+
+letterInput.addEventListener("keydown", (event) => {
+  if (event.key === "Backspace") {
+    event.preventDefault();
+    handleBackspace();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  const target = event.target;
+  if (target === passwordInput || target === letterInput || target.tagName === "INPUT") return;
+  if (/^[a-zA-Z]$/.test(event.key)) {
+    event.preventDefault();
+    handleLetterInput(event.key);
+  }
+  if (event.key === "Backspace") {
+    event.preventDefault();
+    handleBackspace();
+  }
+});
 
 passwordForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -548,4 +815,5 @@ passwordForm.addEventListener("submit", (event) => {
   document.body.classList.remove("revealed");
 });
 
+loadProgressState();
 render();
