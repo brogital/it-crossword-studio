@@ -50,8 +50,19 @@
               </div>
               <div id="crossword-grid" class="crossword-grid" aria-label="Crossword grid"></div>
               <div class="mobile-entry" id="mobile-entry">
-                <label for="letter-input">Type letters</label>
-                <input id="letter-input" class="letter-input" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="next" maxlength="24" placeholder="Select a square, then type">
+                <div class="entry-topline">
+                  <div>
+                    <span class="entry-kicker">Type answer</span>
+                    <strong id="entry-title" class="entry-title">Select a square</strong>
+                  </div>
+                  <span id="entry-count" class="entry-count">0 / 0</span>
+                </div>
+                <div id="entry-slots" class="entry-slots" aria-hidden="true"></div>
+                <div class="entry-input-row">
+                  <label class="sr-only" for="letter-input">Type letters</label>
+                  <input id="letter-input" class="letter-input" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="next" maxlength="24" placeholder="Tap a square first">
+                  <button id="entry-backspace" class="entry-icon-button" type="button" aria-label="Delete letter" title="Delete letter">⌫</button>
+                </div>
                 <span id="entry-status" class="entry-status">No square selected</span>
               </div>
             </div>

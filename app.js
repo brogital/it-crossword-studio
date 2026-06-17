@@ -127,7 +127,11 @@ const wordCountEl = document.querySelector("#word-count");
 const solveCountEl = document.querySelector("#solve-count");
 const gridSizeEl = document.querySelector("#grid-size");
 const letterInput = document.querySelector("#letter-input");
+const entryTitleEl = document.querySelector("#entry-title");
+const entryCountEl = document.querySelector("#entry-count");
+const entrySlotsEl = document.querySelector("#entry-slots");
 const entryStatusEl = document.querySelector("#entry-status");
+const entryBackspaceButton = document.querySelector("#entry-backspace");
 const passwordForm = document.querySelector("#password-form");
 const passwordInput = document.querySelector("#password-input");
 const passwordStatus = document.querySelector("#password-status");
@@ -503,18 +507,49 @@ function renderSelectedClue(placed) {
 function renderEntryStatus(placed) {
   const active = placed.find((item) => getClueKey(item) === activeClueKey);
   if (!active || !activeCellKey) {
+    entryTitleEl.textContent = "Select a square";
+    entryCountEl.textContent = "0 / 0";
+    entrySlotsEl.innerHTML = "";
+    entrySlotsEl.style.setProperty("--slot-count", 1);
     entryStatusEl.textContent = "Select a square in the crossword";
+    letterInput.placeholder = "Tap a square first";
     return;
   }
 
   const [row, col] = activeCellKey.split(",").map(Number);
   const index = active.dir === "across" ? col - active.col : row - active.row;
-  const currentLetter = getThemeLetterState(themes[activeThemeIndex].id).get(activeCellKey);
   const position = Math.max(0, Math.min(active.word.length - 1, index)) + 1;
   const filled = getFilledCount(active, themes[activeThemeIndex].id);
   const solved = isWordSolved(active, themes[activeThemeIndex].id);
-  const typed = currentLetter ? ` · typed ${currentLetter}` : "";
-  entryStatusEl.textContent = `${active.number} ${active.dir.toUpperCase()} · letter ${position} of ${active.word.length}${typed} · ${filled}/${active.word.length} filled${solved ? " · solved" : ""}`;
+  const direction = active.dir.toUpperCase();
+
+  entryTitleEl.textContent = `${active.number} ${direction}`;
+  entryCountEl.textContent = `${filled} / ${active.word.length}`;
+  entryStatusEl.textContent = solved ? "Solved" : `Letter ${position} of ${active.word.length}`;
+  letterInput.placeholder = `${direction} answer`;
+  renderEntrySlots(active, position - 1, solved);
+}
+
+function renderEntrySlots(item, activeIndex, solved) {
+  const letters = getThemeLetterState(themes[activeThemeIndex].id);
+  entrySlotsEl.innerHTML = "";
+  entrySlotsEl.style.setProperty("--slot-count", item.word.length);
+
+  for (let index = 0; index < item.word.length; index += 1) {
+    const cellKey = getWordCellKey(item, index);
+    const userLetter = letters.get(cellKey);
+    const isEdgeHint = !userLetter && (index === 0 || index === item.word.length - 1);
+    const slot = document.createElement("span");
+    slot.className = [
+      "entry-slot",
+      index === activeIndex ? "is-current" : "",
+      isEdgeHint ? "is-hint" : "",
+      userLetter ? "is-filled" : "",
+      solved ? "is-solved" : ""
+    ].filter(Boolean).join(" ");
+    slot.textContent = userLetter || (isEdgeHint ? item.word[index] : "");
+    entrySlotsEl.appendChild(slot);
+  }
 }
 
 function renderAnswerBank(placed) {
@@ -579,6 +614,12 @@ function cellBelongsToWord(item, row, col) {
     return row === item.row && col >= item.col && col < item.col + item.word.length;
   }
   return col === item.col && row >= item.row && row < item.row + item.word.length;
+}
+
+function getWordCellKey(item, index) {
+  const row = item.row + (item.dir === "down" ? index : 0);
+  const col = item.col + (item.dir === "across" ? index : 0);
+  return key(row, col);
 }
 
 function formatPattern(word) {
@@ -801,6 +842,10 @@ printButton.addEventListener("click", () => {
 
 hintButton.addEventListener("click", revealOneWord);
 resetButton.addEventListener("click", resetProgress);
+entryBackspaceButton.addEventListener("click", () => {
+  handleBackspace();
+  focusLetterInput();
+});
 
 letterInput.addEventListener("input", (event) => {
   handleLetterInput(event.target.value);
